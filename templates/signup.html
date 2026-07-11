@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card center">
+    <h2>Sign up</h2>
+    <p class="muted">Enter your name and email. You'll get your login code by email right after.</p>
+    <form method="post">
+        <input type="text" name="name" placeholder="Your name" required autofocus>
+        <input type="email" name="contact" placeholder="Your email" required>
+        <button type="submit" class="btn">Sign up</button>
+    </form>
+    <p class="muted">Already signed up? <a href="{{ url_for('login') }}">Log in here</a>.</p>
+</div>
+{% endblock %}

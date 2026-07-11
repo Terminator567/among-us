@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card center status-card">
+    <h2>{{ alive }} of {{ total }} remain</h2>
+</div>
+
+<div class="card">
+    <h3>Add a player</h3>
+    <form method="post" action="{{ url_for('admin_add_player') }}" class="grid-form">
+        <input type="text" name="name" placeholder="Name" required>
+        <input type="text" name="contact" placeholder="Contact (email/phone)">
+        <input type="text" name="kill_code" placeholder="Kill code (blank = auto)">
+        <label class="checkbox-label"><input type="checkbox" name="is_impostor"> Impostor</label>
+        <button type="submit" class="btn">Add player</button>
+    </form>
+
+    <h4>Import Google Form responses</h4>
+    <p class="muted">In Google Sheets, download the response sheet as CSV, then upload it here. The file needs a Name or Full Name column, an Email or Email Address column, and a Login Code column. Enter each login code manually in the sheet before downloading the CSV; the app uses and emails the exact code you provide.</p>
+    <form method="post" action="{{ url_for('admin_bulk_import') }}" enctype="multipart/form-data" class="inline-form">
+        <input type="file" name="csv_file" accept=".csv" required>
+        <button type="submit" class="btn">Import players and email codes</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Players ({{ players|length }})</h3>
+    <table class="log-table">
+        <tr><th>Name</th><th>Login code</th><th>Kill code</th><th>Impostor?</th><th>Alive?</th><th>Kills</th><th></th></tr>
+        {% for p in players %}
+        <tr>
+            <td>{{ p.name }}</td>
+            <td><code>{{ p.login_code }}</code></td>
+            <td><code>{{ p.kill_code }}</code></td>
+            <td>{{ "🔪" if p.is_impostor else "" }}</td>
+            <td>{{ "✅" if p.alive else "💀" }}</td>
+            <td>{{ p.kills }}</td>
+            <td>
+                {% if p.alive %}
+                <form method="post" action="{{ url_for('admin_eject') }}" class="inline-form" onsubmit="return confirm('Eject {{ p.name }}?');">
+                    <input type="hidden" name="player_id" value="{{ p.id }}">
+                    <button type="submit" class="btn small danger">Eject</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('admin_delete_player', player_id=p.id) }}" class="inline-form" onsubmit="return confirm('Remove {{ p.name }} entirely?');">
+                    <button type="submit" class="btn small">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h4>Randomly assign impostors</h4>
+    <p class="muted">Everyone who signs up starts as a crewmate. Once signups are in, pick how many should be impostors -- this resets and re-rolls the assignment.</p>
+    <form method="post" action="{{ url_for('admin_assign_impostors') }}" class="inline-form" onsubmit="return confirm('This re-rolls who the impostor(s) are. Continue?');">
+        <input type="number" name="num_impostors" value="1" min="1" style="width:80px; display:inline-block;">
+        <button type="submit" class="btn">Assign impostors</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Add a task</h3>
+    <p class="muted">Verified by photo upload only.</p>
+    <form method="post" action="{{ url_for('admin_add_task') }}" class="grid-form">
+        <input type="text" name="description" placeholder="Task description" required>
+        <button type="submit" class="btn">Add task</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Tasks ({{ tasks|length }})</h3>
+    <table class="log-table">
+        <tr><th>Description</th><th></th></tr>
+        {% for t in tasks %}
+        <tr>
+            <td>{{ t.description }}</td>
+            <td>
+                <form method="post" action="{{ url_for('admin_delete_task', task_id=t.id) }}" class="inline-form" onsubmit="return confirm('Remove this task?');">
+                    <button type="submit" class="btn small">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>Task submissions (for spot-checking)</h3>
+    <table class="log-table">
+        <tr><th>Player</th><th>Task</th><th>Proof</th><th>Time</th></tr>
+        {% for s in submissions %}
+        <tr>
+            <td>{{ s.player_name }}</td>
+            <td>{{ s.description }}</td>
+            <td><a href="{{ url_for('uploaded_file', filename=s.proof) }}" target="_blank">View photo</a></td>
+            <td>{{ s.timestamp }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No submissions yet.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>Kill / ejection log</h3>
+    <table class="log-table">
+        <tr><th>Name</th><th>Location</th><th>Time</th></tr>
+        {% for k in kills %}
+        <tr><td>{{ k.name }}</td><td>{{ k.location }}</td><td>{{ k.timestamp }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No deaths yet.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>Game settings</h3>
+    <form method="post" action="{{ url_for('admin_settings') }}" class="grid-form">
+        <label>Game name<input type="text" name="game_name" value="{{ settings.game_name }}"></label>
+        <label>Locations (comma-separated)<input type="text" name="locations" value="{{ settings.locations }}"></label>
+        <label>Kill cooldown (minutes)<input type="number" name="cooldown_minutes" value="{{ settings.cooldown_minutes }}"></label>
+        <label>Kills allowed from (hour, 0-23)<input type="number" name="kill_start_hour" value="{{ settings.kill_start_hour }}"></label>
+        <label>Kills allowed until (hour, 0-23)<input type="number" name="kill_end_hour" value="{{ settings.kill_end_hour }}"></label>
+        <button type="submit" class="btn">Save settings</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Reset game</h3>
+    <p class="muted">Wipes all players, tasks, and logs so you can test a fresh game. Your settings (locations, cooldown, hours) are kept.</p>
+    <form method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('This clears every player, task, and log. Are you sure?');">
+        <button type="submit" class="btn danger">Reset game</button>
+    </form>
+</div>
+
+{% endblock %}

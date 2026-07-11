@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card center status-card">
+    <h2>{{ alive }} of {{ total }} remain</h2>
+    {% if not player.alive %}
+        <p class="dead-banner">💀 You have been eliminated. You can still view the game log.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>Game action</h3>
+    <p class="muted">Only use this after a valid in-person elimination. Invalid submissions are rejected by the server.</p>
+    <form method="post" action="{{ url_for('kill') }}">
+        <input type="text" name="target_killcode" placeholder="Player's private kill code" required {% if not player.alive %}disabled{% endif %}>
+        <select name="location" required {% if not player.alive %}disabled{% endif %}>
+            <option value="" disabled selected>Where did it happen?</option>
+            {% for loc in locations %}
+                <option value="{{ loc.strip() }}">{{ loc.strip() }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn danger" {% if not player.alive %}disabled{% endif %}>Submit code</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Your tasks</h3>
+    <p class="muted">Submitted photos are private and can only be opened by the game admin.</p>
+    <table class="task-table">
+        {% for t in tasks %}
+        <tr class="{{ 'done' if t.status == 'complete' else '' }}">
+            <td>{{ t.description }}</td>
+            <td>
+                {% if t.status == 'complete' %}
+                    ✅ Submitted
+                {% elif player.alive %}
+                    <form method="post" action="{{ url_for('complete_task', task_id=t.id) }}" enctype="multipart/form-data" class="inline-form">
+                        <input type="file" name="photo" accept="image/*" capture="environment" required>
+                        <button type="submit" class="btn small">Upload</button>
+                    </form>
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2">No tasks assigned yet — check back soon.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h3>Death log</h3>
+    <table class="log-table">
+        <tr><th>Name</th><th>Location</th><th>Time</th></tr>
+        {% for d in deaths %}
+        <tr><td>{{ d.name }}</td><td>{{ d.location }}</td><td>{{ d.timestamp }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No one has died yet.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+{% endblock %}

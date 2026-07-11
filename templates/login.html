@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card center">
+    <h2>Enter your login code</h2>
+    <p class="muted">After completing the organiser's Google Form, your private login code is emailed to you.</p>
+    <form method="post">
+        <input type="text" name="login_code" placeholder="Your login code" required autofocus autocomplete="one-time-code">
+        <button type="submit" class="btn">Log in</button>
+    </form>
+    <p class="muted">There is no account creation or signup inside this website.</p>
+</div>
+{% endblock %}

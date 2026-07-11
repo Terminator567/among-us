@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>{{ game_name or "Among Us: Campus Edition" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% if not request.path.startswith('/admin') %}
+        <a class="admin-corner" href="{{ url_for('admin_login') }}" title="Admin">⚙️</a>
+    {% endif %}
+    <div class="wrap">
+        <header class="header">
+            <h1>🔪 {{ game_name or "Among Us: Campus Edition" }}</h1>
+            {% if request.path.startswith('/admin') and session.get('is_admin') %}
+                <a class="logout" href="{{ url_for('admin_logout') }}">Admin logout</a>
+            {% elif session.get('player_id') %}
+                <a class="logout" href="{{ url_for('logout') }}">Log out</a>
+            {% endif %}
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash">
+              {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
