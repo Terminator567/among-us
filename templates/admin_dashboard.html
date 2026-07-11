@@ -197,19 +197,32 @@
 
 <div class="card">
     <h3>Game settings</h3>
-    <form method="post" action="{{ url_for('admin_settings') }}" class="grid-form">
-        <label>Game name<input type="text" name="game_name" value="{{ settings.game_name }}"></label>
-        <label>Locations (comma-separated)<input type="text" name="locations" value="{{ settings.locations }}"></label>
-        <label>Kill cooldown (minutes)<input type="number" name="cooldown_minutes" value="{{ settings.cooldown_minutes }}"></label>
-        <label>Kills allowed from (hour, 0-23)<input type="number" name="kill_start_hour" value="{{ settings.kill_start_hour }}"></label>
-        <label>Kills allowed until (hour, 0-23)<input type="number" name="kill_end_hour" value="{{ settings.kill_end_hour }}"></label>
-        <button type="submit" class="btn">Save settings</button>
+
+    <form
+        method="post"
+        action="{{ url_for('admin_settings') }}"
+        class="grid-form"
+    >
+        <label>
+            Game name
+
+            <input
+                type="text"
+                name="game_name"
+                value="{{ settings.game_name }}"
+                required
+            >
+        </label>
+
+        <button type="submit" class="btn">
+            Save game name
+        </button>
     </form>
 </div>
 
 <div class="card">
     <h3>Reset game</h3>
-    <p class="muted">Wipes all players, tasks, and logs so you can test a fresh game. Your settings (locations, cooldown, hours) are kept.</p>
+    <p class="muted">Wipes all players, tasks, and logs so you can test a fresh game.</p>
     <form method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('This clears every player, task, and log. Are you sure?');">
         <button type="submit" class="btn danger">Reset game</button>
     </form>

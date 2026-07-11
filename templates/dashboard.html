@@ -10,15 +10,17 @@
 
 <div class="card">
     <h3>Game action</h3>
-    <p class="muted">Only use this after a valid in-person elimination. Invalid submissions are rejected by the server.</p>
+    <p class="muted"> Enter the player's private kill code and the location of the elimination.</p>
     <form method="post" action="{{ url_for('kill') }}">
         <input type="text" name="target_killcode" placeholder="Player's private kill code" required {% if not player.alive %}disabled{% endif %}>
-        <select name="location" required {% if not player.alive %}disabled{% endif %}>
-            <option value="" disabled selected>Where did it happen?</option>
-            {% for loc in locations %}
-                <option value="{{ loc.strip() }}">{{ loc.strip() }}</option>
-            {% endfor %}
-        </select>
+        <input
+            type="text"
+            name="location"
+            placeholder="Where did it happen?"
+            maxlength="120"
+            required
+            {% if not player.alive %}disabled{% endif %}
+        >
         <button type="submit" class="btn danger" {% if not player.alive %}disabled{% endif %}>Submit code</button>
     </form>
 </div>

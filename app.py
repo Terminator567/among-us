@@ -13,7 +13,6 @@ import os
 import random
 import smtplib
 import sqlite3
-import time
 import uuid
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -105,11 +104,7 @@ def init_db():
     )
     # Seed default settings if missing
     defaults = {
-        "locations": "Library,Dining Hall,Quad,Gym,Dorm A,Dorm B,Student Union",
-        "cooldown_minutes": "15",
-        "kill_start_hour": "8",   # 24hr clock, kills blocked outside this window
-        "kill_end_hour": "22",
-        "game_name": "Among Us: Campus Edition",
+        "game_name": "Among Us: UNSW Hall Edition",
     }
     for k, v in defaults.items():
         db.execute(
@@ -335,8 +330,6 @@ def dashboard():
         """
     ).fetchall()
 
-    locations = get_setting("locations").split(",")
-
     return render_template(
         "dashboard.html",
         player=player,
@@ -344,7 +337,6 @@ def dashboard():
         deaths=deaths,
         alive=alive_count(),
         total=total_count(),
-        locations=locations,
         game_name=get_setting("game_name"),
     )
 
@@ -352,62 +344,88 @@ def dashboard():
 @app.route("/kill", methods=["POST"])
 def kill():
     player = current_player()
+
     if not player:
         return redirect(url_for("login"))
 
-    if not player["is_impostor"]:
-        flash("Only the impostor can enter kills.")
-        return redirect(url_for("dashboard"))
+    killcode = request.form.get(
+        "target_killcode",
+        "",
+    ).strip()
 
-    if not player["alive"]:
-        flash("You're dead — you can't do that anymore.")
-        return redirect(url_for("dashboard"))
+    location = request.form.get(
+        "location",
+        "",
+    ).strip()
 
-    killcode = request.form.get("target_killcode", "").strip()
-    location = request.form.get("location", "").strip()
     db = get_db()
 
-    # Cooldown check
-    cooldown = int(get_setting("cooldown_minutes", "15")) * 60
-    now = time.time()
-    if now - (player["last_kill_time"] or 0) < cooldown:
-        wait = int((cooldown - (now - (player["last_kill_time"] or 0))) / 60) + 1
-        flash(f"Cooldown active. Wait about {wait} more minute(s) before killing again.")
-        return redirect(url_for("dashboard"))
-
-    # Time-of-day window check
-    hour = datetime.now().hour
-    start_h = int(get_setting("kill_start_hour", "8"))
-    end_h = int(get_setting("kill_end_hour", "22"))
-    if not (start_h <= hour < end_h):
-        flash(f"Kills are only allowed between {start_h}:00 and {end_h}:00.")
-        return redirect(url_for("dashboard"))
-
     target = db.execute(
-        "SELECT * FROM players WHERE kill_code = ? AND alive = 1", (killcode,)
+        """
+        SELECT *
+        FROM players
+        WHERE kill_code = ?
+          AND alive = 1
+        """,
+        (killcode,),
     ).fetchone()
 
-    if not target:
-        flash("No living player matches that kill code.")
+    # Use the same response for all rejected submissions.
+    # This avoids revealing whether the logged-in player is an impostor.
+    if (
+        not player["alive"]
+        or not player["is_impostor"]
+        or not target
+        or target["id"] == player["id"]
+    ):
+        flash("This action could not be recorded.")
         return redirect(url_for("dashboard"))
 
-    if target["id"] == player["id"]:
-        flash("You can't kill yourself.")
-        return redirect(url_for("dashboard"))
+    timestamp = datetime.now().strftime(
+        "%Y-%m-%d %H:%M"
+    )
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    db.execute("UPDATE players SET alive = 0 WHERE id = ?", (target["id"],))
     db.execute(
-        "UPDATE players SET kills = kills + 1, last_kill_time = ? WHERE id = ?",
-        (now, player["id"]),
+        """
+        UPDATE players
+        SET alive = 0
+        WHERE id = ?
+        """,
+        (target["id"],),
     )
+
     db.execute(
-        "INSERT INTO kill_log (victim_id, location, timestamp) VALUES (?, ?, ?)",
-        (target["id"], location or "Unknown", timestamp),
+        """
+        UPDATE players
+        SET kills = kills + 1
+        WHERE id = ?
+        """,
+        (player["id"],),
     )
+
+    db.execute(
+        """
+        INSERT INTO kill_log (
+            victim_id,
+            location,
+            timestamp
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            target["id"],
+            location or "Unknown",
+            timestamp,
+        ),
+    )
+
     db.commit()
 
-    flash(f"Kill confirmed. {target['name']} has been eliminated.")
+    flash(
+        f"Kill confirmed. "
+        f"{target['name']} has been eliminated."
+    )
+
     return redirect(url_for("dashboard"))
 
 
@@ -496,11 +514,7 @@ def admin_dashboard():
         """
     ).fetchall()
     settings_row = {
-        k: get_setting(k)
-        for k in [
-            "locations", "cooldown_minutes", "kill_start_hour",
-            "kill_end_hour", "game_name",
-        ]
+         "game_name": get_setting("game_name"),
     }
     return render_template(
         "admin_dashboard.html",
@@ -885,11 +899,18 @@ def admin_delete_task(task_id):
 def admin_settings():
     if not admin_required():
         return redirect(url_for("admin_login"))
-    for key in ["locations", "cooldown_minutes", "kill_start_hour", "kill_end_hour", "game_name"]:
-        val = request.form.get(key)
-        if val is not None:
-            set_setting(key, val.strip())
-    flash("Settings updated.")
+
+    game_name = request.form.get(
+        "game_name",
+        "",
+    ).strip()
+
+    if not game_name:
+        flash("Game name cannot be empty.")
+        return redirect(url_for("admin_dashboard"))
+
+    set_setting("game_name", game_name)
+    flash("Game name updated.")
     return redirect(url_for("admin_dashboard"))
 
 
@@ -921,8 +942,7 @@ def admin_logout():
 @app.route("/admin/reset", methods=["POST"])
 def admin_reset():
     """Wipes players, tasks, task submissions, and the kill/eject log so
-    you can test a fresh game. Settings (locations, cooldown, etc.) are
-    kept as-is."""
+    you can test a fresh game."""
     if not admin_required():
         return redirect(url_for("admin_login"))
     db = get_db()
