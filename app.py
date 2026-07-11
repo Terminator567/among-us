@@ -160,47 +160,92 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 FROM_EMAIL = os.environ.get("FROM_EMAIL", SMTP_USER or "no-reply@example.com")
 
 
-def send_login_email(name, contact, login_code, kill_code):
-    """Emails a player their login code and kill code. Falls back to
-    console printing if SMTP isn't configured, so this is safe to call
-    during local testing."""
-    subject = "You're in: Among Us Campus Edition"
+def send_login_email(
+    name,
+    contact,
+    login_code,
+    kill_code,
+    is_impostor,
+):
+    """Send a player all game information imported from the CSV.
+
+    Returns True when the email is sent successfully.
+    Returns False when SMTP is not configured or sending fails.
+    """
+
+    role_name = "Impostor" if is_impostor else "Civilian"
+
+    subject = "Your Among Us game information"
+
     body = (
         f"Hi {name},\n\n"
-        f"You're signed up for Among Us: Campus Edition.\n\n"
-        f"Your login code (use this to access the game site): {login_code}\n"
-        f"Your killcode (private -- see below): {kill_code}\n\n"
-        f"Go to the game site and enter your login code to see your tasks, "
-        f"the live death log, and -- if you turn out to be the impostor -- "
-        f"the kill entry form.\n\n"
-        f"Your killcode is the one thing you should never share, except in "
-        f"one situation: if someone tags you in person and claims to be the "
-        f"impostor, you reveal your killcode to them so they can confirm the "
-        f"kill in the app. Don't give it to anyone before that. Don't enter "
-        f"anyone else's killcode yourself unless you actually got it from "
-        f"them after being tagged.\n\n"
-        f"Good luck."
+        f"You have been registered for Among Us: Campus Edition.\n\n"
+        f"Here is your private game information:\n\n"
+        f"Role: {role_name}\n"
+        f"Login code: {login_code}\n"
+        f"Kill code: {kill_code}\n\n"
+        f"Use your login code to enter the game website.\n\n"
+        f"Your kill code must remain private. Do not send it to another "
+        f"player or show it to anyone during the game. If you are eliminated "
+        f"in person, give your kill code only to the player who eliminated "
+        f"you so they can confirm the elimination on the website.\n\n"
+    )
+
+    if is_impostor:
+        body += (
+            f"You are an impostor.\n\n"
+            f"Your objective is to eliminate civilians without being caught. "
+            f"After a valid in-person elimination, enter the victim's kill "
+            f"code into the game website.\n\n"
+        )
+    else:
+        body += (
+            f"You are a civilian.\n\n"
+            f"Complete your assigned tasks, watch for suspicious behaviour, "
+            f"and avoid revealing your kill code unless you have genuinely "
+            f"been eliminated.\n\n"
+        )
+
+    body += (
+        f"Keep this email private for the duration of the game.\n\n"
+        f"Good luck,\n"
+        f"Among Us Game Admin"
     )
 
     if not SMTP_HOST or not contact:
-        print(f"[email skipped -- no SMTP configured or no contact] "
-              f"Would have sent to {contact!r}: {body}")
+        print(
+            "[email skipped -- no SMTP configured or no email address]\n"
+            f"Recipient: {contact!r}\n"
+            f"Subject: {subject}\n\n"
+            f"{body}\n"
+        )
         return False
 
-    msg = MIMEText(body)
+    msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
     msg["From"] = FROM_EMAIL
     msg["To"] = contact
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
+
             if SMTP_USER and SMTP_PASSWORD:
                 server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(FROM_EMAIL, [contact], msg.as_string())
+
+            server.sendmail(
+                FROM_EMAIL,
+                [contact],
+                msg.as_string(),
+            )
+
+        print(f"[email sent] {contact}")
         return True
-    except Exception as e:
-        print(f"[email failed] {contact}: {e}")
+
+    except Exception as error:
+        print(f"[email failed] {contact}: {error}")
         return False
 
 
@@ -497,46 +542,103 @@ def admin_assign_impostors():
 def admin_add_player():
     if not admin_required():
         return redirect(url_for("admin_login"))
+
     db = get_db()
+
     name = request.form.get("name", "").strip()
     contact = request.form.get("contact", "").strip()
-    kill_code = request.form.get("kill_code", "").strip() or uuid.uuid4().hex[:8]
-    is_impostor = 1 if request.form.get("is_impostor") == "on" else 0
-    login_code = generate_login_code(name)
+    login_code = request.form.get("login_code", "").strip()
+    kill_code = request.form.get("kill_code", "").strip()
+    is_impostor = (
+        1 if request.form.get("is_impostor") == "on" else 0
+    )
+
+    if not name:
+        flash("Enter a player name.")
+        return redirect(url_for("admin_dashboard"))
+
+    if not contact or "@" not in contact:
+        flash("Enter a valid email address.")
+        return redirect(url_for("admin_dashboard"))
+
+    if not login_code:
+        flash("Enter a login code.")
+        return redirect(url_for("admin_dashboard"))
+
+    if not kill_code:
+        flash("Enter a kill code.")
+        return redirect(url_for("admin_dashboard"))
+
     try:
         db.execute(
             """
-            INSERT INTO players (name, contact, login_code, kill_code, is_impostor)
+            INSERT INTO players (
+                name,
+                contact,
+                login_code,
+                kill_code,
+                is_impostor
+            )
             VALUES (?, ?, ?, ?, ?)
             """,
-            (name, contact, login_code, kill_code, is_impostor),
+            (
+                name,
+                contact,
+                login_code,
+                kill_code,
+                is_impostor,
+            ),
         )
+
         db.commit()
-        sent = send_login_email(name, contact, login_code, kill_code)
+
+        sent = send_login_email(
+            name=name,
+            contact=contact,
+            login_code=login_code,
+            kill_code=kill_code,
+            is_impostor=is_impostor,
+        )
+
         if sent:
-            flash(f"Added {name} and emailed their login code.")
+            flash(f"Added {name} and sent their game email.")
         else:
-            flash(f"Added {name}. Login code: {login_code} "
-                  f"(email not sent -- check SMTP settings or contact field).")
+            flash(
+                f"Added {name}, but the email was not sent. "
+                f"Check your SMTP configuration and terminal output."
+            )
+
     except sqlite3.IntegrityError:
-        flash("That kill code (or login code) is already in use — try again.")
+        db.rollback()
+        flash(
+            "That email, login code, or kill code is already being used."
+        )
+
     return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/admin/players/bulk_import", methods=["POST"])
 def admin_bulk_import():
-    """Import a CSV exported from Google Forms/Sheets.
+    """Import players and their game information from a CSV.
 
-    Accepted name headers include ``name`` and ``full name``. Accepted email
-    headers include ``email``, ``email address`` and ``contact``. The CSV must
-    also include a manually chosen ``login_code`` (or ``login code``) value for
-    each player. Extra Google Forms columns, such as Timestamp, are ignored.
+    Required columns:
+        name
+        email
+        login_code
+        kill_code
+        impostor
+
+    The importer uses the exact values entered by the organiser.
+    It does not generate or randomly assign any codes or roles.
     """
+
     if not admin_required():
         return redirect(url_for("admin_login"))
+
     file = request.files.get("csv_file")
-    if not file:
-        flash("No file uploaded.")
+
+    if not file or file.filename == "":
+        flash("Please choose a CSV file.")
         return redirect(url_for("admin_dashboard"))
 
     import csv
@@ -545,58 +647,201 @@ def admin_bulk_import():
     try:
         content = file.read().decode("utf-8-sig")
     except UnicodeDecodeError:
-        flash("The CSV could not be read. Export it from Google Sheets as a CSV file.")
+        flash(
+            "The CSV could not be read. Download it from Google Sheets "
+            "using File → Download → Comma-separated values."
+        )
         return redirect(url_for("admin_dashboard"))
 
     reader = csv.DictReader(io.StringIO(content))
-    db = get_db()
-    added = 0
-    skipped = 0
 
-    def normalise(row):
+    if not reader.fieldnames:
+        flash("The uploaded CSV does not contain a header row.")
+        return redirect(url_for("admin_dashboard"))
+
+    normalised_headers = {
+        (header or "").strip().lower().replace(" ", "_")
+        for header in reader.fieldnames
+    }
+
+    required_headers = {
+        "name",
+        "email",
+        "login_code",
+        "kill_code",
+        "impostor",
+    }
+
+    missing_headers = required_headers - normalised_headers
+
+    if missing_headers:
+        missing_text = ", ".join(sorted(missing_headers))
+        flash(f"The CSV is missing required columns: {missing_text}.")
+        return redirect(url_for("admin_dashboard"))
+
+    db = get_db()
+
+    added = 0
+    emails_sent = 0
+    email_failures = 0
+    skipped = 0
+    errors = []
+
+    def normalise_row(raw_row):
         return {
-            (key or "").strip().lower(): (value or "").strip()
-            for key, value in row.items()
+            (key or "").strip().lower().replace(" ", "_"):
+            (value or "").strip()
+            for key, value in raw_row.items()
         }
 
-    for raw_row in reader:
-        row = normalise(raw_row)
-        name = next((row.get(k) for k in ("name", "full name", "player name") if row.get(k)), "")
-        contact = next((row.get(k) for k in ("email address", "email", "contact") if row.get(k)), "")
-        login_code = next((row.get(k) for k in ("login_code", "login code", "logincode") if row.get(k)), "")
+    for row_number, raw_row in enumerate(reader, start=2):
+        row = normalise_row(raw_row)
 
-        if not name or not contact or "@" not in contact or not login_code:
+        name = row.get("name", "")
+        contact = row.get("email", "")
+        login_code = row.get("login_code", "")
+        kill_code = row.get("kill_code", "")
+        impostor_value = row.get("impostor", "")
+
+        if not name:
+            errors.append(f"Row {row_number}: name is missing.")
             skipped += 1
             continue
 
-        # Re-importing the same Google Form export should not create duplicates.
-        if db.execute("SELECT 1 FROM players WHERE lower(contact) = lower(?)", (contact,)).fetchone():
+        if not contact or "@" not in contact:
+            errors.append(
+                f"Row {row_number}: email address is missing or invalid."
+            )
             skipped += 1
             continue
 
-        kill_code = uuid.uuid4().hex[:8]
+        if not login_code:
+            errors.append(f"Row {row_number}: login code is missing.")
+            skipped += 1
+            continue
 
-        # Login codes are supplied by the organiser in the CSV. Reject a row
-        # rather than silently changing the chosen code when it is duplicated.
-        if db.execute("SELECT 1 FROM players WHERE login_code = ?", (login_code,)).fetchone():
+        if not kill_code:
+            errors.append(f"Row {row_number}: kill code is missing.")
+            skipped += 1
+            continue
+
+        if impostor_value not in {"0", "1"}:
+            errors.append(
+                f"Row {row_number}: impostor must be either 0 or 1."
+            )
+            skipped += 1
+            continue
+
+        is_impostor = int(impostor_value)
+
+        existing_email = db.execute(
+            """
+            SELECT id
+            FROM players
+            WHERE lower(contact) = lower(?)
+            """,
+            (contact,),
+        ).fetchone()
+
+        if existing_email:
+            errors.append(
+                f"Row {row_number}: {contact} is already registered."
+            )
+            skipped += 1
+            continue
+
+        existing_login = db.execute(
+            """
+            SELECT id
+            FROM players
+            WHERE login_code = ?
+            """,
+            (login_code,),
+        ).fetchone()
+
+        if existing_login:
+            errors.append(
+                f"Row {row_number}: login code {login_code} is already used."
+            )
+            skipped += 1
+            continue
+
+        existing_kill = db.execute(
+            """
+            SELECT id
+            FROM players
+            WHERE kill_code = ?
+            """,
+            (kill_code,),
+        ).fetchone()
+
+        if existing_kill:
+            errors.append(
+                f"Row {row_number}: kill code {kill_code} is already used."
+            )
             skipped += 1
             continue
 
         try:
-            db.execute(
+            cursor = db.execute(
                 """
-                INSERT INTO players (name, contact, login_code, kill_code, is_impostor)
-                VALUES (?, ?, ?, ?, 0)
+                INSERT INTO players (
+                    name,
+                    contact,
+                    login_code,
+                    kill_code,
+                    is_impostor
+                )
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (name, contact, login_code, kill_code),
+                (
+                    name,
+                    contact,
+                    login_code,
+                    kill_code,
+                    is_impostor,
+                ),
             )
-            send_login_email(name, contact, login_code, kill_code)
+
+            db.commit()
+
+            email_sent = send_login_email(
+                name=name,
+                contact=contact,
+                login_code=login_code,
+                kill_code=kill_code,
+                is_impostor=is_impostor,
+            )
+
             added += 1
-        except sqlite3.IntegrityError:
+
+            if email_sent:
+                emails_sent += 1
+            else:
+                email_failures += 1
+
+        except sqlite3.IntegrityError as error:
+            db.rollback()
+            errors.append(
+                f"Row {row_number}: database rejected the player: {error}"
+            )
             skipped += 1
 
-    db.commit()
-    flash(f"Imported and emailed {added} player(s). Skipped {skipped} invalid, missing-code, or duplicate row(s).")
+    flash(
+        f"Import complete. Added {added} player(s), sent "
+        f"{emails_sent} email(s), had {email_failures} email failure(s), "
+        f"and skipped {skipped} row(s)."
+    )
+
+    for error in errors[:10]:
+        flash(error)
+
+    if len(errors) > 10:
+        flash(
+            f"There were {len(errors) - 10} additional row errors. "
+            f"Check the CSV and the terminal output."
+        )
+
     return redirect(url_for("admin_dashboard"))
 
 
