@@ -14,7 +14,7 @@ import random
 import smtplib
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 
 from flask import (
@@ -24,11 +24,27 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "game.db")
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "private_uploads")
+
+DATA_DIR = os.environ.get(
+    "RAILWAY_VOLUME_MOUNT_PATH",
+    os.environ.get("DATA_DIR", BASE_DIR),
+)
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(DATA_DIR, "game.db")
+UPLOAD_FOLDER = os.path.join(DATA_DIR, "private_uploads")
 ALLOWED_EXT = {"png", "jpg", "jpeg", "heic", "webp"}
 
 app = Flask(__name__)
+
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=14)
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get(
+    "RAILWAY_ENVIRONMENT"
+) is not None
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-before-deploying")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -285,6 +301,7 @@ def login():
             "SELECT * FROM players WHERE login_code = ?", (code,)
         ).fetchone()
         if player:
+            session.permanent = True
             session["player_id"] = player["id"]
             return redirect(url_for("dashboard"))
         flash("That login code wasn't recognised. Double check and try again.")
