@@ -1,10 +1,24 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="card center">
+<div class="card auth-card">
     <h2>Admin login</h2>
-    <form method="post">
-        <input type="password" name="password" placeholder="Admin password" required autofocus>
-        <button type="submit" class="btn">Log in</button>
+
+    <form method="post" class="admin-login-form">
+        <input
+            type="password"
+            name="password"
+            placeholder="Admin password"
+            required
+        >
+
+        <button type="submit" class="btn">
+            Log in as admin
+        </button>
     </form>
+
+    <a href="{{ url_for('login') }}" class="btn secondary player-login-link">
+        Go to player login
+    </a>
 </div>
 {% endblock %}
