@@ -177,12 +177,16 @@ def send_login_email(
     login_code,
     kill_code,
     is_impostor,
+    impostor_teammates=None,
 ):
     """Send a player all game information imported from the CSV.
 
     Returns True when the email is sent successfully.
     Returns False when SMTP is not configured or sending fails.
     """
+
+    if impostor_teammates is None:
+        impostor_teammates = []
 
     role_name = "Impostor" if is_impostor else "Civilian"
 
@@ -204,11 +208,27 @@ def send_login_email(
 
     if is_impostor:
         body += (
-            f"You are an impostor.\n\n"
-            f"Your objective is to eliminate civilians without being caught. "
-            f"After a valid in-person elimination, enter the victim's kill "
-            f"code into the game website.\n\n"
+            "You are an impostor.\n\n"
+            "Your objective is to eliminate civilians without being caught. "
+            "After a valid in-person elimination, enter the victim's kill "
+            "code into the game website.\n\n"
         )
+
+        if impostor_teammates:
+            body += "Your fellow impostors are:\n"
+
+            for teammate in impostor_teammates:
+                body += f"- {teammate}\n"
+
+            body += (
+                "\nWork together carefully and keep each other's identities "
+                "private.\n\n"
+            )
+        else:
+            body += (
+                "You are the only impostor in this game.\n\n"
+            )
+
     else:
         body += (
             f"You are a civilian.\n\n"
@@ -717,6 +737,7 @@ def admin_bulk_import():
     email_failures = 0
     skipped = 0
     errors = []
+    imported_players = []
 
     def normalise_row(raw_row):
         return {
@@ -814,7 +835,7 @@ def admin_bulk_import():
             continue
 
         try:
-            cursor = db.execute(
+            db.execute(
                 """
                 INSERT INTO players (
                     name,
@@ -836,20 +857,15 @@ def admin_bulk_import():
 
             db.commit()
 
-            email_sent = send_login_email(
-                name=name,
-                contact=contact,
-                login_code=login_code,
-                kill_code=kill_code,
-                is_impostor=is_impostor,
-            )
-
             added += 1
 
-            if email_sent:
-                emails_sent += 1
-            else:
-                email_failures += 1
+            imported_players.append({
+                "name": name,
+                "contact": contact,
+                "login_code": login_code,
+                "kill_code": kill_code,
+                "is_impostor": is_impostor,
+            })
 
         except sqlite3.IntegrityError as error:
             db.rollback()
@@ -857,6 +873,50 @@ def admin_bulk_import():
                 f"Row {row_number}: database rejected the player: {error}"
             )
             skipped += 1
+
+
+    # Every valid player has now been imported.
+    # We can safely collect the complete impostor list.
+    impostor_rows = db.execute(
+        """
+        SELECT name
+        FROM players
+        WHERE is_impostor = 1
+        ORDER BY name
+        """
+    ).fetchall()
+
+    impostor_names = [
+        row["name"]
+        for row in impostor_rows
+    ]
+
+
+    # Emails are sent only after the full CSV has been imported.
+    for imported_player in imported_players:
+        teammates = []
+
+        if imported_player["is_impostor"]:
+            teammates = [
+                impostor_name
+                for impostor_name in impostor_names
+                if impostor_name != imported_player["name"]
+            ]
+
+        email_sent = send_login_email(
+            name=imported_player["name"],
+            contact=imported_player["contact"],
+            login_code=imported_player["login_code"],
+            kill_code=imported_player["kill_code"],
+            is_impostor=imported_player["is_impostor"],
+            impostor_teammates=teammates,
+        )
+
+        if email_sent:
+            emails_sent += 1
+        else:
+            email_failures += 1
+
 
     flash(
         f"Import complete. Added {added} player(s), sent "
