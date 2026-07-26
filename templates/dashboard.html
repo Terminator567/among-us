@@ -8,22 +8,19 @@
     {% endif %}
 </div>
 
-<div class="card">
-    <h3>Game action</h3>
-    <p class="muted"> Enter the player's private kill code and the location of the elimination.</p>
-    <form method="post" action="{{ url_for('kill') }}">
-        <input type="text" name="target_killcode" placeholder="Player's private kill code" required {% if not player.alive %}disabled{% endif %}>
-        <input
-            type="text"
-            name="location"
-            placeholder="Where did it happen?"
-            maxlength="120"
-            required
-            {% if not player.alive %}disabled{% endif %}
-        >
-        <button type="submit" class="btn danger" {% if not player.alive %}disabled{% endif %}>Submit code</button>
-    </form>
-</div>
+<section class="announcement-card">
+  <div class="announcement-header">
+    <span class="announcement-label">Game update</span>
+    <h2>Announcements</h2>
+  </div>
+
+  <div class="announcement-message">
+    <p>
+      The game starts Monday week 9, 9:00am. No kills or actions will be counted 
+      before then. Good luck!
+    </p>
+  </div>
+</section>
 
 <div class="card">
     <h3>Your tasks</h3>
@@ -49,6 +46,23 @@
         <tr><td colspan="2">No tasks assigned yet — check back soon.</td></tr>
         {% endfor %}
     </table>
+</div>
+
+<div class="card">
+    <h3>Game action</h3>
+    <p class="muted"> Enter the player's private kill code and the location of the elimination.</p>
+    <form method="post" action="{{ url_for('kill') }}">
+        <input type="text" name="target_killcode" placeholder="Player's private kill code" required {% if not player.alive %}disabled{% endif %}>
+        <input
+            type="text"
+            name="location"
+            placeholder="Where did it happen?"
+            maxlength="120"
+            required
+            {% if not player.alive %}disabled{% endif %}
+        >
+        <button type="submit" class="btn danger" {% if not player.alive %}disabled{% endif %}>Submit code</button>
+    </form>
 </div>
 
 <div class="card">

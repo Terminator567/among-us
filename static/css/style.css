@@ -271,3 +271,37 @@ code {
         grid-template-columns: 1fr;
     }
 }
+
+.announcement-card {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  margin-bottom: 20px;
+}
+
+.announcement-header {
+  margin-bottom: 12px;
+}
+
+.announcement-header h2 {
+  margin: 4px 0 0;
+}
+
+.announcement-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.announcement-message {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.announcement-message p {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
