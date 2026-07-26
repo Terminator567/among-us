@@ -196,7 +196,6 @@ def send_login_email(
         f"Hi {name},\n\n"
         f"You have been registered for Among Us: Campus Edition.\n\n"
         f"Here is your private game information:\n\n"
-        f"Role: {role_name}\n"
         f"Login code: {login_code}\n"
         f"Kill code: {kill_code}\n\n"
         f"Use your login code to enter the game website.\n\n"
