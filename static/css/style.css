@@ -273,35 +273,55 @@ code {
 }
 
 .announcement-card {
+  width: 100%;
+  box-sizing: border-box;
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   margin-bottom: 20px;
 }
 
-.announcement-header {
-  margin-bottom: 12px;
+.announcement-header,
+.announcement-message {
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.announcement-header h2 {
-  margin: 4px 0 0;
-}
-
-.announcement-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.announcement-header h2,
+.announcement-message p {
+  text-align: left;
 }
 
 .announcement-message {
   padding: 14px 16px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .announcement-message p {
   margin: 0;
   line-height: 1.6;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  .announcement-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .announcement-message {
+    padding: 12px 14px;
+  }
+
+  .announcement-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .announcement-message p {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
 }
