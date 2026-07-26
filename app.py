@@ -230,6 +230,12 @@ def send_login_email(
                 "You are the only impostor in this game.\n\n"
             )
 
+        body += (
+            "You may choose one of these five weapons:\n\n"
+
+            "A red marker, TV remote, black water bottle, dino container, vaseline tube.\n\n"
+        )
+
     else:
         body += (
             f"You are a civilian.\n\n"
