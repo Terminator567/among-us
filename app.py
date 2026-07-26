@@ -200,7 +200,7 @@ def send_login_email(
         f"Login code: {login_code}\n"
         f"Kill code: {kill_code}\n\n"
         f"Use your login code to enter the game website.\n\n"
-        f"Game website: {GAME_URL}\n\n"
+        f"Game website: https://among-us-production.up.railway.app\n\n"
         f"Your kill code must remain private. Do not send it to another "
         f"player or show it to anyone during the game. If you are eliminated "
         f"in person, give your kill code only to the player who eliminated "
