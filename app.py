@@ -210,7 +210,7 @@ def send_login_email(
     if is_impostor:
         body += (
             "You are an impostor.\n\n"
-            "Your objective is to eliminate civilians without being caught. "
+            "Your objective is to eliminate crewmates without being caught. "
             "After a valid in-person elimination, enter the victim's kill "
             "code into the game website.\n\n"
         )
@@ -238,7 +238,7 @@ def send_login_email(
 
     else:
         body += (
-            f"You are a civilian.\n\n"
+            f"You are a crewmate.\n\n"
             f"Complete your assigned tasks, watch for suspicious behaviour, "
             f"and avoid revealing your kill code unless you have genuinely "
             f"been eliminated.\n\n"
