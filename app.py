@@ -424,9 +424,7 @@ def kill():
         flash("This action could not be recorded.")
         return redirect(url_for("dashboard"))
 
-    timestamp = datetime.now().strftime(
-        "%Y-%m-%d %H:%M"
-    )
+    timestamp = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
     db.execute(
         """
